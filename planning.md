@@ -121,7 +121,7 @@ Submits an appeal against an existing attribution decision.
 ---
 
 ### GET /log
-Returns the audit log.
+Returns the audit log. 
 
 **Response:**
 ```json
@@ -129,12 +129,13 @@ Returns the audit log.
     {
         "content_id": "string",
         "user_id": "string",
-        "timestamp": "string",
+        "text": "string",
         "s1_score": 0.0,
         "s2_score": 0.0,
         "confidence": 0.0,
         "label": "string",
-        "status": "string"
+        "status": "string",
+        "timestamp": "string"
     }
 ]
 ```
@@ -386,7 +387,6 @@ It was dark and we heard the rain. I could hear the horses on the bridge. The ro
 ## AI Tool Plan
 
 #### Milestone 3
-M3 (submission endpoint + first signal): Which spec sections you'll provide to the AI tool (hint: your detection signals section + the diagram), what you'll ask it to generate (Flask app skeleton + the first signal function), and how you'll verify the output (test with a few inputs directly before wiring into the endpoint).
 
 **Which spec sections I'll provide:** Architecture, API surface, and detection signals sections. 
 
@@ -395,7 +395,6 @@ M3 (submission endpoint + first signal): Which spec sections you'll provide to t
 **How I'll verify the output:** Use `curl` to send a POST request to the /submit endpoint to generate a log object. I'll use GET /log to validate the implementation has logged the submission with an actual value for the `s1_score` attribute, and placeholders for `s2_score`, `confidence`, and `label`.
 
 #### Milestone 4
-M4 (second signal + confidence scoring): Which spec sections you'll provide (detection signals + uncertainty representation + diagram), what you'll ask for (second signal function + scoring logic), and what you'll check (do scores vary meaningfully between clearly AI and clearly human text?).
 
 **Which spec sections I'll provide:** Detection signal, uncertainty representation, and architecture sections.
 
@@ -404,8 +403,6 @@ M4 (second signal + confidence scoring): Which spec sections you'll provide (det
 **How I'll verify the output:** Test scoring with 4 different outputs and validate scores against intuition. Use two clear cases and two boarderline cases to evaluate performance.
 
 #### Milestone 5
-
-M5 (production layer): Which spec sections you'll provide (label variants + appeals workflow + diagram), what you'll ask for (label generation logic + the /appeal endpoint), and how you'll verify (test all three label variants are reachable and that an appeal updates status correctly).
 
 **Which spec sections I'll provide:** Transparency label design, appeals workflow, and architecture sections.
 
