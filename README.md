@@ -172,7 +172,7 @@ An LLM will be used to pattern match the input text against its own training cor
 
 **Output:** Float 0.0–1.0. 0.0 = confidently human-authored, 1.0 = confidently AI-generated.
 
-**Weight in combined score:** 0.65
+**Weight in combined score:** 0.7
 
 ```
 # System prompt:
@@ -196,7 +196,7 @@ Return the number only, no other text.
 | Paragraph length consistency | Consistency of paragraph length throughout the text | Even paragraph lengths | Uneven, idea-driven paragraph lengths |
 | Function word frequency | Distribution of common function words (the, and, of, that) | Characteristic AI distribution | Stable but distinct human distribution |
 
-**Weight in combined score**: 0.35
+**Weight in combined score**: 0.3
 
 ---
 
