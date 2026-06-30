@@ -490,3 +490,7 @@ done
 **What I changed or overrode:** In testing, I found this had could be pulling stylometric scores towards uncertain, as the fallback was included in the average. To make stylometric score more meaninfcul, I removed the fallback to a baseline uncertain score and instead had the fallback return None so that the heuristic could be excluded from the final average. If the sample text was so short so that all heuristics failed, the signal falls back to the same 0.5 baseline uncertain score.
 
 ---
+
+## Demo
+
+[Demo video](https://www.loom.com/share/ffcf585c94404d118de87ab73701398c)
