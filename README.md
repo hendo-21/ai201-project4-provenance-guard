@@ -1,6 +1,4 @@
-## What Provenance Guard Does
-
-Provenance Guard is a backend system that any creative sharing platform could plug into to classify submitted content, score confidence in that classification, surface a transparency label to users, and handle appeals from creators who believe they've been misclassified.
+# Provenance Guard
 
 ---
 
@@ -183,7 +181,7 @@ Return the number only, no other text.
 The two signal scores are combined using a weighted average that favors the LLM signal, which is assumed to be the more accurate classifier, given it operates on meaning and not statistics, and has seen enourmous amounts of both human and AI-generated writing:
 
 ```
-confidence = (0.65 * s1 + 0.35 * s2)
+confidence = (0.65 * s1 + 0.35 * s2) / (0.65 + 0.35)
 ```
 
 If the submitted text is under 150 words, the combined score is dampened toward 0.5 to reflect reduced statistical reliability at short lengths:
@@ -239,181 +237,41 @@ Labels are displayed to the reader alongside submitted content. Each label consi
 
 ---
 
-## Appeals Workflow
+## Validation Testing
 
-### Who Can Appeal
-Any creator may appeal a label on their submitted content regardless of tier. While appeals are most likely from creators labeled "Authorship Uncertain" or "Likely AI-Generated," restricting appeals by tier would undermine the fairness of the system.
+To sanity-check whether the confidence scores are meaningful rather than arbitrary, the system was tested against a small set of hand-picked samples spanning different registers, including known edge cases identified during development.
 
-### Information Captured on Submission
-The appeal form auto-populates the following fields from the original submission:
+| Sample | Expected | s1 (LLM) | s2 (Stylometric) | Confidence | Label | Notes |
+|---|---|---|---|---|---|---|
+| "Artificial intelligence represents a transformative paradigm shift in modern society. It is important to note that while the benefits of AI are numerous, it is equally essential to consider the ethical implications. Furthermore, stakeholders across various sectors must collaborate to ensure responsible deployment." | High-confidence AI | 0.87 | 0.41 | 0.75 | Likely AI-Generated · moderate confidence | Correct directionally; s2 dampened, s1 drove the result |
+| "ok so i finally tried that new ramen place downtown and honestly? underwhelming. the broth was fine but they put WAY too much sodium in it and i was thirsty for like three hours after. my friend got the spicy version and said it was better. probably won't go back unless someone drags me there" | High-confidence human | 0.21 | 0.42 | 0.29 | Likely Human-Written · moderate confidence | Correctly resolved after fixing dampening scope |
+| "The relationship between monetary policy and asset price inflation has been extensively studied in the literature. Central banks face a fundamental tension between their mandate for price stability and the unintended consequences of prolonged low interest rates on equity and real estate valuations." | Uncertain | 0.43 | 0.42 | 0.44 | Authorship Uncertain | Correctly landed in uncertain — intended hard case |
+| "I've been thinking a lot about remote work lately. There are genuine tradeoffs — flexibility and no commute on one side, isolation and blurred work-life boundaries on the other. Studies show productivity varies widely by individual and role type." | Uncertain | 0.21 | 0.40 | 0.29 | Likely Human-Written · moderate confidence | s1 read this as human despite AI-adjacent phrasing |
+| "took this course along with 271 and struggled a bit with time management until the middle of the term. I was often spending half the week on one subject and half the week on the other, and then if either subject was particularly challenging that week, would find myself behind on the other. I switched up my study habits to dedicate equal time to each subject midway through the course and found the experience much less stressful. I think the hardest part of the term was around the midway point with both 162 and 271 having larger and more conceptually challenging projects that pushed me in new ways. I took advantage of the office hours this semester and enjoyed getting to ask more conceptual questions directly to the instructors." | High-confidence human | 0.21 | 0.5 | 0.30 | Likely Human-Written · moderate confidence | s2 diluted the confident s1 signal score |
+| "In the morning I walked down the Boulevard to the rue Soufflot for coffee and brioche. It was a fine morning. The horse-chestnut trees in the Luxembourg gardens were in bloom. There was the pleasant early-morning feeling of a hot day. I read the papers with the coffee and then smoked a cigarette. The flower-women were coming up from the market and arranging their daily stock. Students went by going up to the law school, or down to the Sorbonne." | High-confidence human | 0.21 | 0.53 | 0.30 | Likely Human-Written · moderate confidence | s2 still misfires on uniform short sentences, correctly overridden by s1. Intended hard case. |
 
-| Field | Source |
-|---|---|
-| `post_id` | Auto-populated from original submission |
-| `user_id` | Auto-populated from session |
-
-The creator provides:
-
-| Field | Source |
-|---|---|
-| `appeal_text` | Creator-written reasoning |
-
-The system adds on receipt:
-
-| Field | Source |
-|---|---|
-| `appeal_id` | Generated by system |
-| `appeal_timestamp` | Generated by system |
-|
+*Confidence calculated via a 0.7/0.3 (LLM/stylometric) weighted average. For texts under 150 words, the stylometric score (s2) is dampened toward 0.5 to reflect reduced statistical reliability at short lengths; the LLM score (s1) is not dampened, since its confidence is not a function of sample size in the same way.*
 
 ---
 
-### Status Tracking
+## Spec Reflection
 
-Two separate status fields are maintained:
+**One way the spec helped:**
 
-**Submission status** (on the original content record):
-
-| Status | Meaning |
-|---|---|
-| `active` | No appeal filed; label is current |
-| `under_review` | Appeal filed; label is under review |
-
-**Appeal status** (on the appeal record):
-
-| Status | Meaning |
-|---|---|
-| `pending` | Appeal received, not yet reviewed |
-| `reviewed` | Reviewer has opened the appeal |
-| `approved` | Appeal upheld |
-| `rejected` | Appeal denied |
-
-When an appeal is filed, the submission status updates from `"active"` to `"under_review"` and the appeal record is created with status `"pending"`. Both events are written to the audit log.
+**One way implementation diverged and why:** Dampening methodology.
 
 ---
 
-### What Gets Logged
-Every appeal event appends to the audit log with:
-- `appeal_id`
-- `post_id` (links back to original submission)
-- `user_id`
-- `appeal_text`
-- `appeal_timestamp`
-- `appeal_status`
+## AI Usage
 
----
+#### Instance 1
+**What I asked the AI to do:** Implement `signal_2_stylometrics` using the architecture and detection signal sections of `planning.md`.
 
-### Human Reviewer Queue
-A reviewer opening the appeal queue would see the following for each appeal:
+**What I changed or overrode:** I expanded the function words from a list of 4 words to a list of 35, including pronouns, conjunctions, and prepositions. I also added error handling for use of `statistics.stdev` by providing a fallback to 0.5 in `function_word_frequency` if there is not enough data for `statistics.stdev` to use (function word rate < 2). I also rounded the output from the signal to 2 decimal places for consistency with signal 1.
 
-| Field | Purpose |
-|---|---|
-| Original content (full text) | What the creator submitted |
-| Label shown to user | What the creator is objecting to |
-| Combined confidence score | Overall system verdict |
-| Signal 1 score (LLM) | Individual signal breakdown |
-| Signal 2 score (stylometric) | Individual signal breakdown |
-| Creator appeal text | Creator's reasoning |
-| Appeal timestamp | For sorting queue oldest-first |
-| Final decision + notes | Reviewer's conclusion (written on review) |
+#### Instance 2
+**What I asked the AI to do:** Implement `signal_2_stylometrics` using the architecture and detection signal sections of `planning.md`. It implemented each heuristic with a fallback to baseline uncertainty (0.5) if the heuristic lacked enough data to run a meaninful statistical analysis. 
 
----
-
-### Known Limitations
-
-- Approving an appeal does not currently update the label displayed on the content. Overriding a label post-review is a known gap and flagged as a future TODO.
-- The appeals workflow assumes human review. No automated re-classification is performed on appeal.
-
----
-
-## Database Schema
-
-### Submissions Table
-
-| Field | Type | Description |
-|---|---|---|
-| `content_id` | TEXT PRIMARY KEY | UUID generated on submission |
-| `user_id` | TEXT | Supplied by user on submission |
-| `text` | TEXT | Full submitted content |
-| `s1_score` | REAL | Signal 1 (LLM) float 0.0–1.0 |
-| `s2_score` | REAL | Signal 2 (stylometric) float 0.0–1.0 |
-| `confidence` | REAL | Weighted combined score float 0.0–1.0 |
-| `label` | TEXT | Full label text shown to user |
-| `status` | TEXT | `"active"` or `"under_review"` |
-| `timestamp` | TEXT | ISO 8601 submission timestamp |
-
----
-
-### Appeals Table
-
-| Field | Type | Description |
-|---|---|---|
-| `appeal_id` | TEXT PRIMARY KEY | UUID generated on appeal receipt |
-| `content_id` | TEXT FOREIGN KEY | Links to submissions.content_id |
-| `user_id` | TEXT | Supplied by user on submission |
-| `appeal_text` | TEXT | Creator-written reasoning |
-| `appeal_status` | TEXT | `"pending"`, `"reviewed"`, `"approved"`, `"rejected"` |
-| `appeal_timestamp` | TEXT | ISO 8601 appeal submission timestamp |
-| `reviewer_notes` | TEXT | Reviewer's conclusion, nullable until reviewed |
-
----
-
-### Relationships
-
-Appeals link to submissions via `content_id`. One submission may have multiple appeals (a creator may appeal a revised decision), but in the current implementation a submission is expected to have at most one active appeal at a time.
-
----
-
-## Anticipated Edge Cases
-
-Known blind spots: Minimalist or deliberately plain human prose, unconventional stylistic choices (non-standard capitalization, missing punctuation), poetry and lyric forms, and short texts under ~150 words where the model has insufficient signal.
-
-1. Highly structured text like technical writing might score as AI-generated from the LLM signal given its uniform sentence structure and length, generic vocabulary, and reliance on logical transitions. This sort of writing is often uniform and balanced, which can be viewed as a signal of AI-generated writing. Example:
-
-```
-"The project entered its secondary phase in early Q3, following the successful mitigation of initial supply chain constraints. Key deliverables for this period included the finalization of the user interface architecture and the migration of the legacy database to a cloud-based environment. While the engineering team met the primary deployment deadlines, integration testing revealed minor latency issues in data retrieval protocols. Current remediation efforts are focused on indexing optimization to ensure system stability prior to the wider regional rollout scheduled for next month."
-```
-
-2. Minimalist prose that features short, declarative sentences and limited punctuation variation would likely generate a high-confidence AI score from the heuristics signal. Earnest Hemingway's writing is a great example of this (below).
-
-```
-It was dark and we heard the rain. I could hear the horses on the bridge. The road was muddy. We turned off and went up the hill.
-
-# Citation: A Farewell to Arms, Hemingway
-```
-
----
-
-## AI Tool Plan
-
-#### Milestone 3
-
-**Which spec sections I'll provide:** Architecture, API surface, and detection signals sections. 
-
-**What I'll ask it the AI tool to generate:** The Flask app skeleton, control layer for the API endpoints, and the first signal (LLM inference) function.
-
-**How I'll verify the output:** Use `curl` to send a POST request to the /submit endpoint to generate a log object. I'll use GET /log to validate the implementation has logged the submission with an actual value for the `s1_score` attribute, and placeholders for `s2_score`, `confidence`, and `label`.
-
-#### Milestone 4
-
-**Which spec sections I'll provide:** Detection signal, uncertainty representation, and architecture sections.
-
-**What I'll ask it the AI tool to generate:** The second signal (stylometric heuristics) function and scoring logic.
-
-**How I'll verify the output:** Test scoring with 4 different outputs and validate scores against intuition. Use two clear cases and two boarderline cases to evaluate performance.
-
-#### Milestone 5
-
-**Which spec sections I'll provide:** Transparency label design, appeals workflow, and architecture sections.
-
-**What I'll ask it the AI tool to generate:** The label generation logic and /appeal endpoint.
-
-**How I'll verify the output:** Use `curl` to send a POST request to the /appeal endpoint to generate a log object. I'll use GET /log to validate the implementation has logged the appeal, updated the status for the submission to `under_review`, and the `appeal_text` is populated with the text from the request body.
-
-**Which spec sections I'll provide:** Architecture section and implemented appeals workflow.
-
-**What I'll ask it the AI tool to generate:** A simple front end with a text window, submit functionality, label display, and appeals submission functionality.
-
-**How I'll verify the output:** Use the test examples from milestone 4 to verify the correct labels are returned and displayed on the frontend. Additionally, appeal the final example and confirm the appeal log updates per the spec. 
+**What I changed or overrode:** In testing, I found this had could be pulling stylometric scores towards uncertain, as the fallback was included in the average. To make stylometric score more meaninfcul, I removed the fallback to a baseline uncertain score and instead had the fallback return None so that the heuristic could be excluded from the final average. If the sample text was so short so that all heuristics failed, the signal falls back to the same 0.5 baseline uncertain score.
 
 ---
