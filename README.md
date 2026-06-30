@@ -78,7 +78,7 @@ Accepts a piece of text content for attribution analysis.
 }
 ```
 
-**Response:**
+**Response body:**
 ```json
 {
     "content_id": "string",
