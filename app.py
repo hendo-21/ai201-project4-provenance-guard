@@ -15,7 +15,11 @@ from signals import signal_1_llm, signal_2_stylometric
 load_dotenv()
 
 app = Flask(__name__)
-limiter = Limiter(key_func=lambda: request.json.get("user_id") if request.is_json else get_remote_address(), app=app)
+limiter = Limiter(
+    key_func=lambda: request.json.get("user_id") if request.is_json else get_remote_address(), 
+    app=app, 
+    storage_uri="memory://"
+)
 
 db.init_db()
 
@@ -29,7 +33,7 @@ def parse_request(required_fields):
 
 
 @app.route("/submit", methods=["POST"])
-@limiter.limit("10/minute")
+@limiter.limit("10/minute;100 per day")
 def submit():
     body = parse_request(["user_id", "text"])
     if body is None:

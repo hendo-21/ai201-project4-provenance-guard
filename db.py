@@ -114,10 +114,20 @@ def get_log():
     conn = get_connection()
     rows = conn.execute(
         """
-        SELECT content_id, user_id, text, s1_score, s2_score, confidence, label, status, timestamp
-        FROM submissions
-        ORDER BY timestamp
+        SELECT
+            s.content_id, s.user_id, s.text, s.s1_score, s.s2_score,
+            s.confidence, s.label, s.status, s.timestamp,
+            a.appeal_id, a.appeal_text, a.appeal_status, a.appeal_timestamp
+        FROM submissions s
+        LEFT JOIN appeals a ON s.content_id = a.content_id
+        ORDER BY s.timestamp
         """
     ).fetchall()
     conn.close()
-    return [dict(row) for row in rows]
+    log = []
+    for row in rows:
+        entry = dict(row)
+        if entry["appeal_id"] is None:
+            entry = {k: v for k, v in entry.items() if not k.startswith("appeal_")}
+        log.append(entry)
+    return log
